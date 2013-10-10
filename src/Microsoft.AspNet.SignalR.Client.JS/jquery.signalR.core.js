@@ -544,7 +544,7 @@
                 }
 
                 var transportName = transports[index],
-                    transport = $.type(transportName) === "object" ? transportName : signalR.transports[transportName],
+                    transport = signalR.transports[transportName],
                     initializationComplete = false,
                     onFailed = function () {
                         // Check if we've already triggered onFailed, onStart
@@ -557,12 +557,6 @@
                     };
 
                 connection.transport = transport;
-
-                if (transportName.indexOf("_") === 0) {
-                    // Private member
-                    initialize(transports, index + 1);
-                    return;
-                }
 
                 try {
                     connection._.onFailedTimeoutHandle = window.setTimeout(function () {
@@ -727,9 +721,9 @@
 
                         $.each(signalR.transports, function (key) {
                             if (key === "webSockets" && !res.TryWebSockets) {
-                                // Server said don't even try WebSockets, but keep processing the loop
-                                // BUG: We should check to see if the user passed in only the webSockets transport
-                                //      in which case we should exit right now.
+                                return true;
+                            } else if (key.indexOf("_") === 0) {
+                                // Private member
                                 return true;
                             }
                             supportedTransports.push(key);
@@ -739,17 +733,25 @@
                             // ordered list provided
                             $.each(config.transport, function () {
                                 var transport = this;
-                                if ($.type(transport) === "object" || ($.type(transport) === "string" && $.inArray("" + transport, supportedTransports) >= 0)) {
-                                    transports.push($.type(transport) === "string" ? "" + transport : transport);
+                                if ($.type(transport) === "string") {
+                                    // specific transport provided as named transport, e.g. "longPolling"
+                                    if (transport === "auto") {
+                                        transports = supportedTransports;
+                                        return true;
+                                    } else if ($.inArray(transport, supportedTransports) >= 0) {
+                                        transports.push(transport);
+                                    }
                                 }
                             });
-                        } else if ($.type(config.transport) === "object" ||
-                                        $.inArray(config.transport, supportedTransports) >= 0) {
-                            // specific transport provided, as object or a named transport, e.g. "longPolling"
-                            transports.push(config.transport);
-                        } else { // default "auto"
-                            transports = supportedTransports;
+                        } else if ($.type(config.transport) === "string") {
+                            // specific transport provided as named transport, e.g. "longPolling"
+                            if (config.transport === "auto") {
+                                transports = supportedTransports;
+                            } else if ($.inArray(config.transport, supportedTransports) >= 0) {
+                                transports.push(config.transport);
+                            }
                         }
+
                         initialize(transports);
                     }
                 }
